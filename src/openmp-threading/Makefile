@@ -80,7 +80,7 @@ $(program): $(obj) XSbench_header.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(program) $(obj)
+	rm -rf $(program) $(obj) core.*
 
 edit:
 	vim -p $(source) XSbench_header.h
