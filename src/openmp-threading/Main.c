@@ -6,6 +6,13 @@
 
 int main( int argc, char* argv[] )
 {
+#ifdef USE_CALI
+cali_id_t thread_attr = cali_create_attribute("thread_id", CALI_TYPE_INT, CALI_ATTR_ASVALUE | CALI_ATTR_SKIP_EVENTS);
+#pragma omp parallel
+{
+cali_set_int(thread_attr, omp_get_thread_num());
+}
+#endif
 	// =====================================================================
 	// Initialization & Command Line Read-In
 	// =====================================================================
@@ -19,6 +26,15 @@ int main( int argc, char* argv[] )
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mype);
+
+#ifdef USE_CALI
+cali_id_t mpi_attr = cali_create_attribute("mpi_rank", CALI_TYPE_INT, CALI_ATTR_ASVALUE | CALI_ATTR_SKIP_EVENTS);
+#pragma omp parallel
+{
+cali_set_int(mpi_attr, mype);
+}
+#endif
+
 	#endif
 
 	// Process CLI Fields -- store in "Inputs" structure

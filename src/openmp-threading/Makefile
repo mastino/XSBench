@@ -4,9 +4,10 @@
 
 COMPILER    = gnu
 OPTIMIZE    = yes
-DEBUG       = no
-PROFILE     = no
-MPI         = yes
+DEBUG       = yes
+#PROFILE     = yes
+#MPI         = yes
+USE_CALI    = yes
 
 #===============================================================================
 # Program name & source code list
@@ -49,7 +50,16 @@ endif
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g
-  LDFLAGS  += -g
+  LDFLAGS += -g
+endif
+
+ifeq ($(USE_CALI),yes)
+  CFLAGS  += -g
+  LDFLAGS += -g
+  CFLAGS  += -I${CALI_DIR}/include
+  CFLAGS  += -DUSE_CALI
+  LDFLAGS += -L${CALI_DIR}/lib64
+  LDFLAGS += -lcaliper
 endif
 
 # Profiling Flags
@@ -60,7 +70,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-  CFLAGS += -O3
+  CFLAGS += -O3 -mcpu=thunderx2t99 -mcmodel=large
 endif
 
 # MPI

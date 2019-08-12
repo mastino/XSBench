@@ -12,8 +12,12 @@
 // line argument.
 ////////////////////////////////////////////////////////////////////////////////////
 
+
 unsigned long long run_event_based_simulation(Inputs in, SimulationData SD, int mype)
 {
+//#ifdef USE_CALI
+//CALI_MARK_FUNCTION_BEGIN;
+//#endif
 	if( mype == 0)	
 		printf("Beginning event based simulation...\n");
 	
@@ -41,7 +45,12 @@ unsigned long long run_event_based_simulation(Inputs in, SimulationData SD, int 
 	// Begin Actual Simulation Loop 
 	////////////////////////////////////////////////////////////////////////////////
 	unsigned long long verification = 0;
-	#pragma omp parallel for schedule(dynamic,100) reduction(+:verification)
+	#pragma omp parallel 
+        {
+#ifdef USE_CALI
+CALI_MARK_BEGIN("event_simulation");
+#endif
+        #pragma omp for schedule(dynamic,100) reduction(+:verification)
 	for( int i = 0; i < in.lookups; i++ )
 	{
 		// Set the initial seed value
@@ -94,12 +103,21 @@ unsigned long long run_event_based_simulation(Inputs in, SimulationData SD, int 
 		}
 		verification += max_idx+1;
 	}
-
+#ifdef USE_CALI
+CALI_MARK_END("event_simulation");
+#endif
+	}
+//#ifdef USE_CALI
+//CALI_MARK_FUNCTION_END;
+//#endif
 	return verification;
 }
 
 unsigned long long run_history_based_simulation(Inputs in, SimulationData SD, int mype)
 {
+//#ifdef USE_CALI
+//CALI_MARK_FUNCTION_BEGIN;
+//#endif
 	if( mype == 0)	
 		printf("Beginning history based simulation...\n");
 
@@ -126,7 +144,13 @@ unsigned long long run_history_based_simulation(Inputs in, SimulationData SD, in
 	unsigned long long verification = 0;
 
 	// Begin outer lookup loop over particles. This loop is independent.
-	#pragma omp parallel for schedule(dynamic, 100) reduction(+:verification)
+	#pragma omp parallel
+	{
+#ifdef USE_CALI
+CALI_MARK_BEGIN("history_simulation");
+#endif
+
+	#pragma omp for schedule(dynamic, 100) reduction(+:verification)
 	for( int p = 0; p < in.particles; p++ )
 	{
 		// Set the initial seed value
@@ -143,7 +167,7 @@ unsigned long long run_history_based_simulation(Inputs in, SimulationData SD, in
 		// Inner XS Lookup Loop
 		// This loop is dependent!
 		// i.e., Next iteration uses data computed in previous iter.
-		for( int i = 0; i < in.lookups; i++ )
+                for( int i = 0; i < in.lookups; i++ )
 		{
 			double macro_xs_vector[5] = {0};
 
@@ -175,7 +199,7 @@ unsigned long long run_history_based_simulation(Inputs in, SimulationData SD, in
 			// of thread-specific values in large array via CUDA thrust, etc)
 			double max = -1.0;
 			int max_idx = 0;
-			for(int j = 0; j < 5; j++ )
+                	for(int j = 0; j < 5; j++ )
 			{
 				if( macro_xs_vector[j] > max )
 				{
@@ -193,7 +217,7 @@ unsigned long long run_history_based_simulation(Inputs in, SimulationData SD, in
 			// artificially enforcing this dependence based on fast
 			// forwarding the LCG state
 			uint64_t n_forward = 0;
-			for( int j = 0; j < 5; j++ )
+                	for( int j = 0; j < 5; j++ )
 				if( macro_xs_vector[j] > 1.0 )
 					n_forward++;
 			if( n_forward > 0 )
@@ -202,8 +226,14 @@ unsigned long long run_history_based_simulation(Inputs in, SimulationData SD, in
 			p_energy = LCG_random_double(&seed);
 			mat      = pick_mat(&seed); 
 		}
-
+	}		
+#ifdef USE_CALI
+CALI_MARK_END("history_simulation");
+#endif
 	}
+//#ifdef USE_CALI
+//CALI_MARK_FUNCTION_END;
+//#endif
 	return verification;
 }
 
@@ -213,10 +243,12 @@ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
                            double * restrict egrid, int * restrict index_data,
                            NuclideGridPoint * restrict nuclide_grids,
                            long idx, double * restrict xs_vector, int grid_type, int hash_bins ){
+
 	// Variables
 	double f;
 	NuclideGridPoint * low, * high;
 
+        
 	// If using only the nuclide grid, we must perform a binary search
 	// to find the energy location in this particular nuclide's grid.
 	if( grid_type == NUCLIDE )
@@ -275,7 +307,7 @@ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
 	
 	// calculate the re-useable interpolation factor
 	f = (high->energy - p_energy) / (high->energy - low->energy);
-
+	
 	// Total XS
 	xs_vector[0] = high->total_xs - f * (high->total_xs - low->total_xs);
 	
@@ -292,6 +324,9 @@ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
 	xs_vector[4] = high->nu_fission_xs - f * (high->nu_fission_xs - low->nu_fission_xs);
 }
 
+
+
+
 // Calculates macroscopic cross section based on a given material & energy 
 void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
                          long n_gridpoints, int * restrict num_nucs,
@@ -300,12 +335,16 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
                          NuclideGridPoint * restrict nuclide_grids,
                          int * restrict mats,
                          double * restrict macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs ){
+//#ifdef USE_CALI
+//CALI_MARK_FUNCTION_BEGIN;
+//#endif
+
 	int p_nuc; // the nuclide we are looking up
 	long idx = -1;	
 	double conc; // the concentration of the nuclide in the material
 
 	// cleans out macro_xs_vector
-	for( int k = 0; k < 5; k++ )
+        for( int k = 0; k < 5; k++ )
 		macro_xs_vector[k] = 0;
 
 	// If we are using the unionized energy grid (UEG), we only
@@ -339,9 +378,12 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
 		calculate_micro_xs( p_energy, p_nuc, n_isotopes,
 		                    n_gridpoints, egrid, index_data,
 		                    nuclide_grids, idx, xs_vector, grid_type, hash_bins );
-		for( int k = 0; k < 5; k++ )
+                for( int k = 0; k < 5; k++ )
 			macro_xs_vector[k] += xs_vector[k] * conc;
 	}
+//#ifdef USE_CALI
+//CALI_MARK_FUNCTION_END;
+//#endif
 }
 
 
@@ -417,7 +459,7 @@ int pick_mat( uint64_t * seed )
 	double roll = LCG_random_double(seed);
 
 	// makes a pick based on the distro
-	for( int i = 0; i < 12; i++ )
+        for( int i = 0; i < 12; i++ )
 	{
 		double running = 0;
 		for( int j = i; j > 0; j-- )

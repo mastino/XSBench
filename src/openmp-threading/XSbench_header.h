@@ -18,6 +18,10 @@
 #include "papi.h"
 #endif
 
+#ifdef USE_CALI
+#include <caliper/cali.h>
+#endif
+
 // Grid types
 #define UNIONIZED 0
 #define NUCLIDE 1
