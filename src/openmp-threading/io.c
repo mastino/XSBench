@@ -407,6 +407,11 @@ Inputs read_CLI( int argc, char * argv[] )
 			print_CLI_error();
 	}
 
+	if( input.simulation_method == EVENT_BASED )
+	{
+		input.lookups =  input.lookups * input.particles;
+	}
+
 	// Validate Input
 	
 	// Validate nthreads

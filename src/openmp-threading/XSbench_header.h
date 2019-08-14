@@ -116,6 +116,7 @@ int pick_mat( uint64_t * seed );
 double LCG_random_double(uint64_t * seed);
 uint64_t fast_forward_LCG(uint64_t seed, uint64_t n);
 unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData SD, int mype);
+unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData SD, int mype);
 
 // GridInit.c
 SimulationData grid_init_do_not_profile( Inputs in, int mype );

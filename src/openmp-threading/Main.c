@@ -22,7 +22,7 @@ cali_set_int(thread_attr, omp_get_thread_num());
 	int nprocs = 1;
 	unsigned long long verification;
 
-	#ifdef MPI
+#ifdef MPI
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mype);
@@ -35,7 +35,7 @@ cali_set_int(mpi_attr, mype);
 }
 #endif
 
-	#endif
+#endif
 
 	// Process CLI Fields -- store in "Inputs" structure
 	Inputs in = read_CLI( argc, argv );
@@ -93,6 +93,8 @@ cali_set_int(mpi_attr, mype);
 			verification = run_event_based_simulation(in, SD, mype);
 		else if( in.kernel_id == 1 )
 			verification = run_event_based_simulation_optimization_1(in, SD, mype);
+		else if( in.kernel_id == 2 )
+			verification = run_event_based_simulation_optimization_2(in, SD, mype);
 		else
 		{
 			printf("Error: No kernel ID %d found!\n", in.kernel_id);
@@ -100,7 +102,12 @@ cali_set_int(mpi_attr, mype);
 		}
 	}
 	else
+	{
 		verification = run_history_based_simulation(in, SD, mype);
+	}
+
+	// End Simulation Timer
+	omp_end = omp_get_wtime();
 
 	if( mype == 0)	
 	{	
@@ -108,8 +115,6 @@ cali_set_int(mpi_attr, mype);
 		printf("Simulation complete.\n" );
 	}
 
-	// End Simulation Timer
-	omp_end = omp_get_wtime();
 
 	// =====================================================================
 	// Output Results & Finalize
