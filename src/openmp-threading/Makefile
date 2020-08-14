@@ -7,7 +7,7 @@ OPTIMIZE    = yes
 DEBUG       = yes
 #PROFILE     = yes
 #MPI         = yes
-USE_CALI    = yes
+#USE_CALI    = yes
 
 #===============================================================================
 # Program name & source code list
@@ -49,7 +49,7 @@ endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -Winline
   LDFLAGS += -g
 endif
 
