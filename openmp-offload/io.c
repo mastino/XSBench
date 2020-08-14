@@ -1,4 +1,8 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
+
+#ifdef MPI
+#include<mpi.h>
+#endif
 
 // Prints program logo
 void logo(int version)
@@ -61,7 +65,6 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		border_print();
 
 		// Print the results
-		printf("Threads:     %d\n", in.nthreads);
 		#ifdef MPI
 		printf("MPI ranks:   %d\n", nprocs);
 		#endif
@@ -120,11 +123,7 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	cudaDeviceProp prop;
-	int device;
-	cudaGetDevice(&device);
-	cudaGetDeviceProperties ( &prop, device );
-		printf("CUDA Device:                  %s\n", prop.name); 
+	printf("Programming Model:            OpenMP Target Offloading\n");
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -159,10 +158,8 @@ void print_inputs(Inputs in, int nprocs, int version )
 	printf("Total XS Lookups:             "); fancy_int(in.lookups);
 	#ifdef MPI
 	printf("MPI Ranks:                    %d\n", nprocs);
-	printf("OMP Threads per MPI Rank:     %d\n", in.nthreads);
 	printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
 	#else
-	printf("Threads:                      %d\n", in.nthreads);
 	printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);
 	#endif
 	printf("Binary File Mode:             ");
@@ -211,7 +208,6 @@ void print_CLI_error(void)
 	printf("Usage: ./XSBench <options>\n");
 	printf("Options include:\n");
 	printf("  -m <simulation method>   Simulation method (history, event)\n");
-	printf("  -t <threads>             Number of OpenMP threads to run\n");
 	printf("  -s <size>                Size of H-M Benchmark to run (small, large, XL, XXL)\n");
 	printf("  -g <gridpoints>          Number of gridpoints per nuclide (overrides -s defaults)\n");
 	printf("  -G <grid type>           Grid search type (unionized, nuclide, hash). Defaults to unionized.\n");
@@ -220,7 +216,7 @@ void print_CLI_error(void)
 	printf("  -h <hash bins>           Number of hash bins (only relevant when used with \"-G hash\")\n");
 	printf("  -b <binary mode>         Read or write all data structures to file. If reading, this will skip initialization phase. (read, write)\n");
 	printf("  -k <kernel ID>           Specifies which kernel to run. 0 is baseline, 1, 2, etc are optimized variants. (0 is default.)\n");
-	printf("Default is equivalent to: -m history -s large -l 34 -p 500000 -G unionized -k 0\n");
+	printf("Default is equivalent to: -m history -s large -l 34 -p 500000 -G unionized\n");
 	printf("See readme for full description of default run values\n");
 	exit(4);
 }
@@ -233,7 +229,7 @@ Inputs read_CLI( int argc, char * argv[] )
 	input.simulation_method = HISTORY_BASED;
 	
 	// defaults to max threads on the system	
-	input.nthreads = 1;
+	input.nthreads = omp_get_num_procs();
 	
 	// defaults to 355 (corresponding to H-M Large benchmark)
 	input.n_isotopes = 355;
@@ -255,7 +251,7 @@ Inputs read_CLI( int argc, char * argv[] )
 
 	// default to no binary read/write
 	input.binary_mode = NONE;
-
+	
 	// defaults to baseline kernel
 	input.kernel_id = 0;
 	
@@ -279,16 +275,8 @@ Inputs read_CLI( int argc, char * argv[] )
 	{
 		char * arg = argv[i];
 
-		// nthreads (-t)
-		if( strcmp(arg, "-t") == 0 )
-		{
-			if( ++i < argc )
-				input.nthreads = atoi(argv[i]);
-			else
-				print_CLI_error();
-		}
 		// n_gridpoints (-g)
-		else if( strcmp(arg, "-g") == 0 )
+		if( strcmp(arg, "-g") == 0 )
 		{	
 			if( ++i < argc )
 			{
@@ -452,7 +440,7 @@ Inputs read_CLI( int argc, char * argv[] )
 
 void binary_write( Inputs in, SimulationData SD )
 {
-	const char * fname = "XS_data.dat";
+	char * fname = "XS_data.dat";
 	printf("Writing all data structures to binary file %s...\n", fname);
 	FILE * fp = fopen(fname, "w");
 
@@ -474,7 +462,7 @@ SimulationData binary_read( Inputs in )
 {
 	SimulationData SD;
 	
-	const char * fname = "XS_data.dat";
+	char * fname = "XS_data.dat";
 	printf("Reading all data structures from binary file %s...\n", fname);
 
 	FILE * fp = fopen(fname, "r");

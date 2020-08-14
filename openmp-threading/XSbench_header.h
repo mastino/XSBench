@@ -7,14 +7,22 @@
 #include<string.h>
 #include<strings.h>
 #include<math.h>
+#include<unistd.h>
+#include<sys/time.h>
 #include<assert.h>
 #include<stdint.h>
-#include <chrono> 
-#include <CL/sycl.hpp>
+
+#ifdef OPENMP
+#include<omp.h>
+#endif
 
 // Papi Header
 #ifdef PAPI
 #include "papi.h"
+#endif
+
+#ifdef USE_CALI
+#include <caliper/cali.h>
 #endif
 
 // Grid types
@@ -65,17 +73,17 @@ typedef struct{
 	double * unionized_energy_array;    // Length = length_unionized_energy_array
 	int * index_grid;                   // Length = length_index_grid
 	NuclideGridPoint * nuclide_grid;    // Length = length_nuclide_grid
-	long length_num_nucs;
-	long length_concs;
-	long length_mats;
-	long length_unionized_energy_array;
+	int length_num_nucs;
+	int length_concs;
+	int length_mats;
+	int length_unionized_energy_array;
 	long length_index_grid;
-	long length_nuclide_grid;
+	int length_nuclide_grid;
 	int max_num_nucs;
 	double * p_energy_samples;
-	long length_p_energy_samples;
+	int length_p_energy_samples;
 	int * mat_samples;
-	long length_mat_samples;
+	int length_mat_samples;
 } SimulationData;
 
 // io.c
@@ -91,26 +99,27 @@ void binary_write( Inputs in, SimulationData SD );
 SimulationData binary_read( Inputs in );
 
 // Simulation.c
-unsigned long long run_event_based_simulation_unionized(Inputs in, SimulationData SD, int mype);
-int pick_mat(unsigned long * seed);
+unsigned long long run_event_based_simulation(Inputs in, SimulationData SD, int mype);
+unsigned long long run_history_based_simulation(Inputs in, SimulationData SD, int mype);
+void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
+                           long n_gridpoints,
+                           double * restrict egrid, int * restrict index_data,
+                           NuclideGridPoint * restrict nuclide_grids,
+                           long idx, double * restrict xs_vector, int grid_type, int hash_bins );
+void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
+                         long n_gridpoints, int * restrict num_nucs,
+                         double * restrict concs,
+                         double * restrict egrid, int * restrict index_data,
+                         NuclideGridPoint * restrict nuclide_grids,
+                         int * restrict mats,
+                         double * restrict macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs );
+long grid_search( long n, double quarry, double * restrict A);
+long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high);
+int pick_mat( uint64_t * seed );
 double LCG_random_double(uint64_t * seed);
 uint64_t fast_forward_LCG(uint64_t seed, uint64_t n);
-template <class T>
-long grid_search( long n, double quarry, T A);
-template <class Double_Type, class Int_Type, class NGP_Type>
-void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
-		long n_gridpoints,
-		Double_Type  egrid, Int_Type  index_data,
-		NGP_Type  nuclide_grids,
-		long idx, double *  xs_vector, int grid_type, int hash_bins );
-template <class Double_Type, class Int_Type, class NGP_Type, class E_GRID_TYPE, class INDEX_TYPE>
-void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
-		long n_gridpoints, Int_Type  num_nucs,
-		Double_Type  concs,
-		E_GRID_TYPE  egrid, INDEX_TYPE  index_data,
-		NGP_Type  nuclide_grids,
-		Int_Type  mats,
-		double * macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs );
+unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData SD, int mype);
+unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData SD, int mype);
 
 // GridInit.c
 SimulationData grid_init_do_not_profile( Inputs in, int mype );
@@ -125,30 +134,4 @@ double get_time(void);
 int * load_num_nucs(long n_isotopes);
 int * load_mats( int * num_nucs, long n_isotopes, int * max_num_nucs );
 double * load_concs( int * num_nucs, int max_num_nucs );
-
-// binary search for energy on nuclide energy grid
-// This funciton is defined in the header, as it is also used by the
-// initialization region of the program.
-template <class T>
-long grid_search_nuclide( long n, double quarry, T A, long low, long high)
-{
-	long lowerLimit = low;
-	long upperLimit = high;
-	long examinationPoint;
-	long length = upperLimit - lowerLimit;
-
-	while( length > 1 )
-	{
-		examinationPoint = lowerLimit + ( length / 2 );
-
-		if( A[examinationPoint].energy > quarry )
-			upperLimit = examinationPoint;
-		else
-			lowerLimit = examinationPoint;
-
-		length = upperLimit - lowerLimit;
-	}
-
-	return lowerLimit;
-}
 #endif

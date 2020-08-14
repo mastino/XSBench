@@ -41,7 +41,9 @@ cali_set_int(mpi_attr, mype);
 	Inputs in = read_CLI( argc, argv );
 
 	// Set number of OpenMP Threads
+	#ifdef OPENMP
 	omp_set_num_threads(in.nthreads); 
+	#endif
 
 	// Print-out of Input Summary
 	if( mype == 0 )
@@ -84,7 +86,7 @@ cali_set_int(mpi_attr, mype);
 	}
 
 	// Start Simulation Timer
-	omp_start = omp_get_wtime();
+	omp_start = get_time();
 
 	// Run simulation
 	if( in.simulation_method == EVENT_BASED )
