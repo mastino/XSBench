@@ -1,0 +1,8 @@
+# binaries
+*.o
+*.exe
+
+# tau
+.tau/*
+
+
